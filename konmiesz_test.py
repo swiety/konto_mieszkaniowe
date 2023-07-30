@@ -35,3 +35,36 @@ class TestKonMiesz(unittest.TestCase):
                 wzrost_m2=0.13),
             0.13,
             "Art. 14.3: wskaźnik premii to wyższy czynnik")
+
+    def test_odsetki_bankowe_Pekao_wczesna_lokata(self):
+        daty = pd.date_range(
+            start='2023-10-01',
+            periods=12,
+            freq=pd.offsets.MonthBegin()
+        )
+        odsetki_Pekao = odsetki_bankowe_Pekao(daty)
+        # ponieważ lokata założona przed 2023-10-31, to oprocentowanie:
+        # - pierwsze 6 miesięcy 5%
+        # - do 2024-07-08 (czyli kolejne 4 miesięce) 3%
+        # - a potem 1/7 inflacji (ostatnie 2 raty)
+        expected = pd.DataFrame({
+            'Odsetki %': [0.05] * 6 + [0.03] * 4 + [None] * 2,
+            'Odsetki % inflacji': [None] * 10 + [1 / 7] * 2
+        })
+        pd.testing.assert_frame_equal(odsetki_Pekao, expected)
+
+    def test_odsetki_bankowe_Pekao_pozna_lokata(self):
+        daty = pd.date_range(
+            start='2024-01-01',
+            periods=12,
+            freq=pd.offsets.MonthBegin()
+        )
+        odsetki_Pekao = odsetki_bankowe_Pekao(daty)
+        # ponieważ lokata założona po 2023-10-31, to oprocentowanie:
+        # - do 2024-07-08 (czyli pierwsze 7 miesięcy) 3%
+        # - a potem 1/7 inflacji (osstatnie 5 rat)
+        expected = pd.DataFrame({
+            'Odsetki %': [0.03] * 7 + [None] * 5,
+            'Odsetki % inflacji': [None] * 7 + [1 / 7] * 5
+        })
+        pd.testing.assert_frame_equal(odsetki_Pekao, expected)

@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from matplotlib.ticker import StrMethodFormatter
+from pandas import DataFrame
+from pandas.io.formats.style import Styler
 
 # TODO: 1% dla banku
 # TODO: porównaj do EDO i do inflacji
@@ -32,8 +35,10 @@ def roczny_wskaznik_premii(inflacja: float, wzrost_m2: float | None):
     return min(0.15, max(0.01, wskaznik))
 
 
-def zalozenia_inflacji_i_wzrostu_m2(inflacja: list, wzrost_m2: list):
-    df_inflacja = pd.DataFrame(data={
+def zalozenia_inflacji_i_wzrostu_m2(
+        inflacja: list,
+        wzrost_m2: list) -> DataFrame:
+    df_inflacja = DataFrame(data={
         'Inflacja': inflacja,
         'Wzrost m2': wzrost_m2
     },
@@ -50,7 +55,7 @@ def zalozenia_inflacji_i_wzrostu_m2(inflacja: list, wzrost_m2: list):
     return df_inflacja
 
 
-def formatuj_inflacje(df_inflacja: pd.DataFrame):
+def formatuj_inflacje(df_inflacja: DataFrame):
     styled = df_inflacja.style.format({
         'Inflacja': '{:,.2%}'.format,
         'Premia': '{:,.2%}'.format,
@@ -62,8 +67,15 @@ def oblicz_skladnik_naliczeniowy(suma_wplat=float, premia=float):
     return suma_wplat * premia / 12  # Art. 14.2
 
 
-def symulacja_konta(data_startu, ile_lat, ile_wplat, wysokosc_wplat, premia):
-    df_konto = pd.DataFrame(data={
+def symulacja_konta(data_startu: str,
+                    ile_lat: int,
+                    ile_wplat: int,
+                    wysokosc_wplat: int,
+                    zalozenia: DataFrame) -> (Styler,
+                                              Styler,
+                                              DataFrame,
+                                              DataFrame):
+    df_konto = DataFrame(data={
         'Miesiąc': pd.date_range(
             start=data_startu,
             periods=ile_wplat,
@@ -77,7 +89,7 @@ def symulacja_konta(data_startu, ile_lat, ile_wplat, wysokosc_wplat, premia):
     df_konto['Rok'] = pd.DatetimeIndex(df_konto['Miesiąc']).year
     df_konto['Składnik Naliczeniowy'] = df_konto.apply(
         lambda row: oblicz_skladnik_naliczeniowy(
-            suma_wplat=row['Suma Wpłat'], premia=premia._get_value(
+            suma_wplat=row['Suma Wpłat'], premia=zalozenia._get_value(
                 str(row['Rok']), 'Premia')
         ), axis=1
     )
@@ -123,3 +135,51 @@ def rysuj_wykres_lokaty(df_konto):
     plt.gca().yaxis.set_major_formatter(
         StrMethodFormatter('{x:,.0f} zł'))  # 2 decimal places
     plt.show()
+
+
+def odsetki_bankowe_Pekao(daty: pd.DatetimeIndex) -> DataFrame:
+    """
+    Zwraca oprocentowanie lokaty w banku Pekao.
+
+    Stan na 2023-07-29, źródło:
+    https://www.pekao.com.pl/klient-indywidualny/oszczedzam-i-inwestuje/konto-mieszkaniowe.html
+
+    - pierwsze 6 miesięcy oszczędzania (dla kont otwartych do 2023-10-31): 5%
+    - potem do 2024-07-08: 3%
+    - potem 76% oprocentowania standardowego, na dzisiaj 1.52%,
+      zakładam 1/7 inflacji (na dzisiaj inflacja 11.5%)
+
+    Args:
+        daty (pd.DatetimeIndex): daty poszczególnych wpłat
+
+    Returns:
+        DataFrame: dwie kolumny:
+            'Odsetki %' dla absolutnych wartości oprocentowania,
+            'Odsetki % inflacji' dla oprocentowania względem inflacji
+    """
+
+    data_3pct = pd.Timestamp(2024, 7, 9)
+
+    if daty[0] < pd.Timestamp(2023, 11, 1):  # założona przed końcem 2023-10-31
+        ile_5pct = 6  # pierwsze 6 miesięcy oprocentowanie 5%
+        # kolejne raty 3% do 2024-07-08 (zakładam, że włącznie)
+        ile_3pct = np.count_nonzero(daty[6:] < data_3pct)
+        # reszta rat 1/7 inflacji
+        reszta = np.count_nonzero(daty[6:] > data_3pct)
+        pct = [0.05] * ile_5pct + [0.03] * ile_3pct + [None] * reszta
+        pct_infl = [None] * (ile_5pct + ile_3pct) + [1 / 7] * reszta
+        return DataFrame({
+            'Odsetki %': pct,
+            'Odsetki % inflacji': pct_infl
+        })
+    else:
+        # raty 3% do 2024-07-08 (zakładam, że włącznie)
+        ile_3pct = np.count_nonzero(daty < data_3pct)
+        # reszta rat 1/7 inflacji
+        reszta = np.count_nonzero(daty > data_3pct)
+        pct = [0.03] * ile_3pct + [None] * reszta
+        pct_infl = [None] * ile_3pct + [1 / 7] * reszta
+        return DataFrame({
+            'Odsetki %': pct,
+            'Odsetki % inflacji': pct_infl
+        })
