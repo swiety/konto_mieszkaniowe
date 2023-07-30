@@ -1,3 +1,5 @@
+from typing import Callable
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,7 +11,36 @@ from pandas.io.formats.style import Styler
 # TODO: porównaj do EDO i do inflacji
 # TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
 # TODO: code formatting
-#       autopep8 --in-place --aggressive --aggressive konmiesz.py
+#       autopep8 --in-place --aggressive --aggressive *.py
+
+
+class Procent:
+    def __init__(self, pct: float) -> None:
+        self.pct = pct
+
+    def efektywny_procent(self, inflacja: float) -> float:
+        return self.pct
+
+    def __str__(self) -> str:
+        return f"{self.pct:,.2%}"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Procent):
+            return NotImplemented
+        return self.pct == other.pct
+
+
+class ProcentInflacji(Procent):
+    def efektywny_procent(self, inflacja: float) -> float:
+        return self.pct * inflacja
+
+    def __str__(self) -> str:
+        return f"{self.pct:,.2%} inflacji"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProcentInflacji):
+            return NotImplemented
+        return self.pct == other.pct
 
 
 def roczny_wskaznik_premii(inflacja: float, wzrost_m2: float | None):
@@ -68,19 +99,21 @@ def oblicz_skladnik_naliczeniowy(suma_wplat=float, premia=float):
 
 
 def symulacja_konta(data_startu: str,
-                    ile_lat: int,
                     ile_wplat: int,
                     wysokosc_wplat: int,
-                    zalozenia: DataFrame) -> (Styler,
-                                              Styler,
-                                              DataFrame,
-                                              DataFrame):
+                    zalozenia: DataFrame,
+                    lokata: Callable[[pd.DatetimeIndex],
+                                     DataFrame] | None = None) -> (Styler,
+                                                                   Styler,
+                                                                   DataFrame,
+                                                                   DataFrame):
+    daty_wplat = pd.date_range(
+        start=data_startu,
+        periods=ile_wplat,
+        freq=pd.offsets.MonthBegin()
+    )
     df_konto = DataFrame(data={
-        'Miesiąc': pd.date_range(
-            start=data_startu,
-            periods=ile_wplat,
-            freq=pd.offsets.MonthBegin()
-        ),
+        'Miesiąc': daty_wplat,
         'Wpłata': [wysokosc_wplat] * ile_wplat
     },
         index=pd.Index(range(1, ile_wplat + 1), name="Wpłata nr")
@@ -96,9 +129,20 @@ def symulacja_konta(data_startu: str,
     df_konto['Premia Sumaryczna'] = df_konto['Składnik Naliczeniowy'].cumsum()
     df_konto['Total z Premią'] = df_konto.apply(
         lambda row: row['Suma Wpłat'] + row['Premia Sumaryczna'], axis=1)
-    df_konto = df_konto.reindex(columns=[
-        'Miesiąc', 'Rok', 'Wpłata', 'Składnik Naliczeniowy',
-        'Suma Wpłat', 'Premia Sumaryczna', 'Total z Premią'])
+    lokata = lokata(daty_wplat) if lokata else DataFrame(
+        data=[Procent(0)] * ile_wplat, index=pd.Index(range(1, ile_wplat + 1))
+    )
+    df_konto['Odsetki banku [%]'] = lokata
+    df_konto = df_konto.reindex(
+        columns=[
+            'Miesiąc',
+            'Rok',
+            'Wpłata',
+            'Odsetki banku [%]',
+            'Składnik Naliczeniowy',
+            'Suma Wpłat',
+            'Premia Sumaryczna',
+            'Total z Premią'])
     df_roczne = df_konto[['Wpłata', 'Składnik Naliczeniowy', 'Rok']].groupby(
         'Rok').sum()
     df_roczne = df_roczne.rename(columns={
@@ -159,6 +203,9 @@ def odsetki_bankowe_Pekao(daty: pd.DatetimeIndex) -> DataFrame:
     """
 
     data_3pct = pd.Timestamp(2024, 7, 9)
+    pct5 = Procent(0.05)
+    pct3 = Procent(0.03)
+    pct1_7th_infl = ProcentInflacji(1.0 / 7.0)
 
     if daty[0] < pd.Timestamp(2023, 11, 1):  # założona przed końcem 2023-10-31
         ile_5pct = 6  # pierwsze 6 miesięcy oprocentowanie 5%
@@ -166,20 +213,14 @@ def odsetki_bankowe_Pekao(daty: pd.DatetimeIndex) -> DataFrame:
         ile_3pct = np.count_nonzero(daty[6:] < data_3pct)
         # reszta rat 1/7 inflacji
         reszta = np.count_nonzero(daty[6:] > data_3pct)
-        pct = [0.05] * ile_5pct + [0.03] * ile_3pct + [None] * reszta
-        pct_infl = [None] * (ile_5pct + ile_3pct) + [1 / 7] * reszta
-        return DataFrame({
-            'Odsetki %': pct,
-            'Odsetki % inflacji': pct_infl
-        })
     else:
+        ile_5pct = 0
         # raty 3% do 2024-07-08 (zakładam, że włącznie)
         ile_3pct = np.count_nonzero(daty < data_3pct)
         # reszta rat 1/7 inflacji
         reszta = np.count_nonzero(daty > data_3pct)
-        pct = [0.03] * ile_3pct + [None] * reszta
-        pct_infl = [None] * ile_3pct + [1 / 7] * reszta
-        return DataFrame({
-            'Odsetki %': pct,
-            'Odsetki % inflacji': pct_infl
-        })
+
+    pct = [pct5] * ile_5pct + [pct3] * ile_3pct + [pct1_7th_infl] * reszta
+    return DataFrame(data={
+        'Odsetki %': pct
+    }, index=pd.Index(range(1, len(daty) + 1)))

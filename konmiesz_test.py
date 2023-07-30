@@ -47,10 +47,9 @@ class TestKonMiesz(unittest.TestCase):
         # - pierwsze 6 miesięcy 5%
         # - do 2024-07-08 (czyli kolejne 4 miesięce) 3%
         # - a potem 1/7 inflacji (ostatnie 2 raty)
-        expected = pd.DataFrame({
-            'Odsetki %': [0.05] * 6 + [0.03] * 4 + [None] * 2,
-            'Odsetki % inflacji': [None] * 10 + [1 / 7] * 2
-        })
+        expected = pd.DataFrame(data={
+            'Odsetki %': [Procent(0.05)] * 6 + [Procent(0.03)] * 4 + [ProcentInflacji(1.0 / 7.0)] * 2
+        }, index=pd.Index(range(1, 13)))
         pd.testing.assert_frame_equal(odsetki_Pekao, expected)
 
     def test_odsetki_bankowe_Pekao_pozna_lokata(self):
@@ -63,8 +62,7 @@ class TestKonMiesz(unittest.TestCase):
         # ponieważ lokata założona po 2023-10-31, to oprocentowanie:
         # - do 2024-07-08 (czyli pierwsze 7 miesięcy) 3%
         # - a potem 1/7 inflacji (osstatnie 5 rat)
-        expected = pd.DataFrame({
-            'Odsetki %': [0.03] * 7 + [None] * 5,
-            'Odsetki % inflacji': [None] * 7 + [1 / 7] * 5
-        })
+        expected = pd.DataFrame(data={
+            'Odsetki %': [Procent(0.03)] * 7 + [ProcentInflacji(1.0 / 7.0)] * 5
+        }, index=pd.Index(range(1, 13)))
         pd.testing.assert_frame_equal(odsetki_Pekao, expected)
