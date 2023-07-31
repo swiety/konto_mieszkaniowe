@@ -67,12 +67,13 @@ class TestKonMiesz(unittest.TestCase):
         }, index=pd.Index(range(1, 13)))
         pd.testing.assert_frame_equal(odsetki_pekao, expected)
 
-    def test_licz_odsetki_procent_zlozony_stale_oproc_i_wplata(self):
+    def test_licz_odsetki_procent_zlozony_oproc_stale_wplata_stala(self):
         """Testy dla stałego oprocentowania i wpłaty
         """
 
         wplaty = DataFrame([1000] * 6)
         odsetki = DataFrame([0.03] * 6)
+        index = pd.Index(range(1, 7))
 
         suma_wplat = 0
         oczekiwane = []
@@ -80,9 +81,32 @@ class TestKonMiesz(unittest.TestCase):
             suma_wplat += wplata
             suma_wplat *= (1 + procent / 12)
             oczekiwane.append(float(suma_wplat))
-        oczekiwane = DataFrame(oczekiwane)
+        oczekiwane = DataFrame(data=oczekiwane, index=index)
 
         pd.testing.assert_frame_equal(
             licz_odsetki_procent_zlozony(wplaty=wplaty,
-                                         odsetki=odsetki),
+                                         odsetki=odsetki,
+                                         index=index),
+            oczekiwane)
+
+    def test_licz_odsetki_procent_zlozony_oproc_zmienne_wplata_stala(self):
+        """Testy dla oprocentowania zmiennego i stałej wpłaty
+        """
+
+        wplaty = DataFrame([1000] * 6)
+        odsetki = DataFrame([0.03] * 3 + [0.02] * 3)
+        index = pd.Index(range(1, 7))
+
+        suma_wplat = 0
+        oczekiwane = []
+        for wplata, procent in zip(wplaty[0].to_numpy(), odsetki.to_numpy()):
+            suma_wplat += wplata
+            suma_wplat *= (1 + procent / 12)
+            oczekiwane.append(float(suma_wplat))
+        oczekiwane = DataFrame(data=oczekiwane, index=index)
+
+        pd.testing.assert_frame_equal(
+            licz_odsetki_procent_zlozony(wplaty=wplaty,
+                                         odsetki=odsetki,
+                                         index=index),
             oczekiwane)

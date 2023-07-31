@@ -16,13 +16,14 @@ MIESIAC = 'Miesiąc'
 WPLATA = 'Wpłata'
 WPLATA_NR = "Wpłata nr"
 SUMA_WPLAT = 'Suma<br/>Wpłat'
+ODSETKI_BANKU_PCT = 'Odsetki<br/>banku<br/>[%]'
+WPLATY_Z_ODSETKAMI = "Wpłaty<br/>z<br/>odsetkami"
 SKLADNIK_NALICZ = 'Składnik<br/>Naliczeniowy'
 PREMIA_SUMARYCZNA = 'Premia<br/>Sumaryczna'
 TOTAL_Z_PREMIA = 'Total<br/>z<br/>Premią'
 PREMIA_ROCZNA = "Premia<br/>roczna"
 WPLATA_CALKOWITA = 'Wpłata<br/>całkowita'
 PREMIA_CALKOWITA = 'Premia<br/>całkowita'
-ODSETKI_BANKU_PCT = 'Odsetki<br/>banku<br/>[%]'
 
 # TODO: 1% dla banku
 # TODO: porównaj do EDO i do inflacji
@@ -155,12 +156,17 @@ def symulacja_konta(data_startu: str,
         lambda row: row[ODSETKI_BANKU_PCT].efektywny_procent(zalozenia.at[
             str(row[ROK]), INFLACJA]),
         axis=1)
+    df_konto[WPLATY_Z_ODSETKAMI] = licz_odsetki_procent_zlozony(
+        wplaty=df_konto[WPLATA], odsetki=df_konto[ODSETKI_BANKU_PCT],
+        index=df_konto.index
+    )
     df_konto = df_konto.reindex(
         columns=[
             MIESIAC,
             ROK,
             WPLATA,
             ODSETKI_BANKU_PCT,
+            WPLATY_Z_ODSETKAMI,
             SKLADNIK_NALICZ,
             SUMA_WPLAT,
             PREMIA_SUMARYCZNA,
@@ -181,7 +187,8 @@ def symulacja_konta(data_startu: str,
         SKLADNIK_NALICZ: '{:,.2f} zł'.format,
         PREMIA_SUMARYCZNA: '{:,.2f} zł'.format,
         TOTAL_Z_PREMIA: '{:,.2f} zł'.format,
-        ODSETKI_BANKU_PCT: '{:,.2%}'.format
+        ODSETKI_BANKU_PCT: '{:,.2%}'.format,
+        WPLATY_Z_ODSETKAMI: '{:,.2f} zł'.format
     })
     df_roczne_styled = df_roczne.style.format({
         PREMIA_ROCZNA: '{:,.0f} zł'.format,
@@ -249,12 +256,14 @@ def odsetki_bankowe_pekao(daty: pd.DatetimeIndex) -> DataFrame:
 
 def licz_odsetki_procent_zlozony(
         wplaty: DataFrame,
-        odsetki: DataFrame) -> DataFrame:
+        odsetki: DataFrame,
+        index: pd.Index) -> DataFrame:
     total = []
-    wplaty, odsetki = (list(x[0].to_numpy()) for x in (wplaty, odsetki))
+    wplaty, odsetki = (list(x.values) for x in (wplaty, odsetki))
 
     wplata = wplaty.pop(0)
     procent = odsetki.pop(0)
+    wartosc_poczatkowa = 0
     powtorzen = 1
     while wplaty:
         if wplata == wplaty[0] and procent == odsetki[0]:
@@ -262,11 +271,20 @@ def licz_odsetki_procent_zlozony(
             wplaty.pop(0)
             odsetki.pop(0)
         else:
-            raise NotImplemented
+            total.extend(npf.fv(
+                rate=procent / 12,
+                nper=range(powtorzen + 1),
+                pmt=-wplata,
+                pv=-wartosc_poczatkowa,
+                when='begin')[1:])
+            wplata = wplaty.pop(0)
+            procent = odsetki.pop(0)
+            powtorzen = 1
+            wartosc_poczatkowa = total[-1]
     total.extend(npf.fv(
         rate=procent / 12,
         nper=range(powtorzen + 1),
         pmt=-wplata,
-        pv=0,
+        pv=-wartosc_poczatkowa,
         when='begin')[1:])
-    return DataFrame(total)
+    return DataFrame(data=total, index=index)
