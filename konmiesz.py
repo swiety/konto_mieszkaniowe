@@ -2,11 +2,11 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy_financial as npf
 import pandas as pd
 from matplotlib.ticker import StrMethodFormatter
 from pandas import DataFrame
 from pandas.io.formats.style import Styler
-
 
 WZROST_M2 = 'Wzrost<br/>m2'
 INFLACJA = 'Inflacja'
@@ -245,3 +245,28 @@ def odsetki_bankowe_pekao(daty: pd.DatetimeIndex) -> DataFrame:
     return DataFrame(data={
         'Odsetki': pct
     }, index=pd.Index(range(1, len(daty) + 1)))
+
+
+def licz_odsetki_procent_zlozony(
+        wplaty: DataFrame,
+        odsetki: DataFrame) -> DataFrame:
+    total = []
+    wplaty, odsetki = (list(x[0].to_numpy()) for x in (wplaty, odsetki))
+
+    wplata = wplaty.pop(0)
+    procent = odsetki.pop(0)
+    powtorzen = 1
+    while wplaty:
+        if wplata == wplaty[0] and procent == odsetki[0]:
+            powtorzen += 1
+            wplaty.pop(0)
+            odsetki.pop(0)
+        else:
+            raise NotImplemented
+    total.extend(npf.fv(
+        rate=procent / 12,
+        nper=range(powtorzen + 1),
+        pmt=-wplata,
+        pv=0,
+        when='begin')[1:])
+    return DataFrame(total)

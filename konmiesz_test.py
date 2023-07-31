@@ -36,33 +36,53 @@ class TestKonMiesz(unittest.TestCase):
             0.13,
             "Art. 14.3: wskaźnik premii to wyższy czynnik")
 
-    def test_odsetki_bankowe_Pekao_wczesna_lokata(self):
+    def test_odsetki_bankowe_pekao_wczesna_lokata(self):
         daty = pd.date_range(
             start='2023-10-01',
             periods=12,
             freq=pd.offsets.MonthBegin()
         )
-        odsetki_Pekao = odsetki_bankowe_pekao(daty)
+        odsetki_pekao = odsetki_bankowe_pekao(daty)
         # ponieważ lokata założona przed 2023-10-31, to oprocentowanie:
         # - pierwsze 6 miesięcy 5%
         # - do 2024-07-08 (czyli kolejne 4 miesięce) 3%
         # - a potem 1/7 inflacji (ostatnie 2 raty)
         expected = pd.DataFrame(data={
-            'Odsetki %': [Procent(0.05)] * 6 + [Procent(0.03)] * 4 + [ProcentInflacji(1.0 / 7.0)] * 2
+            'Odsetki': [Procent(0.05)] * 6 + [Procent(0.03)] * 4 + [ProcentInflacji(1.0 / 7.0)] * 2
         }, index=pd.Index(range(1, 13)))
-        pd.testing.assert_frame_equal(odsetki_Pekao, expected)
+        pd.testing.assert_frame_equal(odsetki_pekao, expected)
 
-    def test_odsetki_bankowe_Pekao_pozna_lokata(self):
+    def test_odsetki_bankowe_pekao_pozna_lokata(self):
         daty = pd.date_range(
             start='2024-01-01',
             periods=12,
             freq=pd.offsets.MonthBegin()
         )
-        odsetki_Pekao = odsetki_bankowe_pekao(daty)
+        odsetki_pekao = odsetki_bankowe_pekao(daty)
         # ponieważ lokata założona po 2023-10-31, to oprocentowanie:
         # - do 2024-07-08 (czyli pierwsze 7 miesięcy) 3%
         # - a potem 1/7 inflacji (osstatnie 5 rat)
         expected = pd.DataFrame(data={
-            'Odsetki %': [Procent(0.03)] * 7 + [ProcentInflacji(1.0 / 7.0)] * 5
+            'Odsetki': [Procent(0.03)] * 7 + [ProcentInflacji(1.0 / 7.0)] * 5
         }, index=pd.Index(range(1, 13)))
-        pd.testing.assert_frame_equal(odsetki_Pekao, expected)
+        pd.testing.assert_frame_equal(odsetki_pekao, expected)
+
+    def test_licz_odsetki_procent_zlozony_stale_oproc_i_wplata(self):
+        """Testy dla stałego oprocentowania i wpłaty
+        """
+
+        wplaty = DataFrame([1000] * 6)
+        odsetki = DataFrame([0.03] * 6)
+
+        suma_wplat = 0
+        oczekiwane = []
+        for wplata, procent in zip(wplaty[0].to_numpy(), odsetki.to_numpy()):
+            suma_wplat += wplata
+            suma_wplat *= (1 + procent / 12)
+            oczekiwane.append(float(suma_wplat))
+        oczekiwane = DataFrame(oczekiwane)
+
+        pd.testing.assert_frame_equal(
+            licz_odsetki_procent_zlozony(wplaty=wplaty,
+                                         odsetki=odsetki),
+            oczekiwane)
