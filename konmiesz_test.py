@@ -42,7 +42,7 @@ class TestKonMiesz(unittest.TestCase):
             periods=12,
             freq=pd.offsets.MonthBegin()
         )
-        odsetki_Pekao = odsetki_bankowe_Pekao(daty)
+        odsetki_Pekao = odsetki_bankowe_pekao(daty)
         # ponieważ lokata założona przed 2023-10-31, to oprocentowanie:
         # - pierwsze 6 miesięcy 5%
         # - do 2024-07-08 (czyli kolejne 4 miesięce) 3%
@@ -58,7 +58,7 @@ class TestKonMiesz(unittest.TestCase):
             periods=12,
             freq=pd.offsets.MonthBegin()
         )
-        odsetki_Pekao = odsetki_bankowe_Pekao(daty)
+        odsetki_Pekao = odsetki_bankowe_pekao(daty)
         # ponieważ lokata założona po 2023-10-31, to oprocentowanie:
         # - do 2024-07-08 (czyli pierwsze 7 miesięcy) 3%
         # - a potem 1/7 inflacji (osstatnie 5 rat)
