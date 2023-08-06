@@ -142,9 +142,9 @@ class TestKonMiesz(unittest.TestCase):
                                 stop=2027,
                                 name=ROK).astype(np.int32),
             data={
-                WPLATA_CALKOWITA: [12_000, 24_000, 36_000],
-                PREMIA_CALKOWITA: [624.00, 2_400.00, 5_328.00]
+                WPLATA_TOTAL: [12_000, 24_000, 36_000],
+                PREMIA_TOTAL: [624.00, 2_400.00, 5_328.00]
             })
 
         pd.testing.assert_frame_equal(
-            df_roczne[[WPLATA_CALKOWITA, PREMIA_CALKOWITA]], oczekiwane)
+            df_roczne[[WPLATA_TOTAL, PREMIA_TOTAL]], oczekiwane)

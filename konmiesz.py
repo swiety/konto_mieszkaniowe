@@ -2,7 +2,8 @@
 # TODO: porównaj do EDO i do inflacji
 # TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
 # TODO: code formatting
-#       autopep8 --in-place --aggressive --aggressive *.py
+#       fswatch *py |\
+#       xargs -n 1 -I {} autopep8 --in-place --aggressive --aggressiv {}
 
 from typing import Callable
 
@@ -21,17 +22,14 @@ PREMIA = 'Premia'
 MIESIAC = 'Miesiąc'
 WPLATA = 'Wpłata'
 WPLATA_NR = "Wpłata nr"
-SUMA_WPLAT = 'Suma<br/>Wpłat'
+WPLATA_TOTAL = 'Suma<br/>Wpłat'
 ODSETKI_BANKU_PCT = 'Odsetki<br/>banku<br/>[%]'
 ODSETKI_BANKU_ABS = 'Odsetki<br/>banku'
 ODSETKI_BANKU_TOTAL = 'Suma<br/>odsetek<br/>banku'
 WPLATY_Z_ODSETKAMI = "Wpłaty<br/>z<br/>odsetkami"
-SKLADNIK_NALICZ = 'Składnik<br/>Naliczeniowy'
-PREMIA_SUMARYCZNA = 'Premia<br/>Sumaryczna'
+PREMIA_SKLADNIK_NALICZ = 'Składnik<br/>Naliczeniowy'
+PREMIA_TOTAL = 'Premia<br/>Sumaryczna'
 TOTAL_Z_PREMIA = 'Total<br/>z<br/>Premią'
-PREMIA_ROCZNA = "Premia<br/>roczna"
-WPLATA_CALKOWITA = 'Wpłata<br/>całkowita'
-PREMIA_CALKOWITA = 'Premia<br/>całkowita'
 
 
 class Procent:
@@ -138,16 +136,17 @@ def symulacja_konta(data_startu: str,
     },
         index=pd.Index(range(1, ile_wplat + 1), name=WPLATA_NR)
     )
-    df_konto[SUMA_WPLAT] = df_konto[WPLATA].cumsum()
+    df_konto[WPLATA_TOTAL] = df_konto[WPLATA].cumsum()
     df_konto[ROK] = pd.DatetimeIndex(df_konto[MIESIAC]).year
-    df_konto[SKLADNIK_NALICZ] = df_konto.apply(
+    df_konto[PREMIA_SKLADNIK_NALICZ] = df_konto.apply(
         lambda row: oblicz_skladnik_naliczeniowy(
-            suma_wplat=row[SUMA_WPLAT], premia=zalozenia.at[str(row[ROK]), PREMIA]
+            suma_wplat=row[WPLATA_TOTAL],
+            premia=zalozenia.at[str(row[ROK]), PREMIA]
         ), axis=1
     )
-    df_konto[PREMIA_SUMARYCZNA] = df_konto[SKLADNIK_NALICZ].cumsum()
+    df_konto[PREMIA_TOTAL] = df_konto[PREMIA_SKLADNIK_NALICZ].cumsum()
     df_konto[TOTAL_Z_PREMIA] = df_konto.apply(
-        lambda row: row[SUMA_WPLAT] + row[PREMIA_SUMARYCZNA], axis=1)
+        lambda row: row[WPLATA_TOTAL] + row[PREMIA_TOTAL], axis=1)
     lokata = lokata(daty_wplat) if lokata else DataFrame(
         data=[Procent(0)] * ile_wplat, index=pd.Index(range(1, ile_wplat + 1))
     )
@@ -163,7 +162,7 @@ def symulacja_konta(data_startu: str,
         index=df_konto.index
     )
     df_konto[ODSETKI_BANKU_ABS] = df_konto.apply(
-        lambda row: row[WPLATY_Z_ODSETKAMI] - row[SUMA_WPLAT], axis=1
+        lambda row: row[WPLATY_Z_ODSETKAMI] - row[WPLATA_TOTAL], axis=1
     )
     df_konto[ODSETKI_BANKU_TOTAL] = df_konto[ODSETKI_BANKU_ABS].cumsum()
     df_konto = df_konto.reindex(
@@ -171,48 +170,49 @@ def symulacja_konta(data_startu: str,
             MIESIAC,
             ROK,
             WPLATA,
-            SUMA_WPLAT,
+            WPLATA_TOTAL,
             ODSETKI_BANKU_PCT,
             ODSETKI_BANKU_ABS,
             ODSETKI_BANKU_TOTAL,
             WPLATY_Z_ODSETKAMI,
-            SKLADNIK_NALICZ,
-            PREMIA_SUMARYCZNA,
+            PREMIA_SKLADNIK_NALICZ,
+            PREMIA_TOTAL,
             TOTAL_Z_PREMIA])
 
-    df_roczne = df_konto[[WPLATA, SKLADNIK_NALICZ, ROK]].groupby(
+    df_roczne = df_konto[
+        [ROK, WPLATA, ODSETKI_BANKU_ABS, PREMIA_SKLADNIK_NALICZ]
+    ].groupby(
         ROK).sum()
-    df_roczne = df_roczne.rename(columns={
-        SKLADNIK_NALICZ: PREMIA_ROCZNA,
-        WPLATA: SUMA_WPLAT
-    })
-    df_roczne[WPLATA_CALKOWITA] = df_roczne[SUMA_WPLAT].cumsum()
-    df_roczne[PREMIA_CALKOWITA] = df_roczne[PREMIA_ROCZNA].cumsum()
+    df_roczne[WPLATA_TOTAL] = df_roczne[WPLATA].cumsum()
+    del df_roczne[WPLATA]
+    df_roczne[ODSETKI_BANKU_TOTAL] = df_roczne[ODSETKI_BANKU_ABS].cumsum()
+    del df_roczne[ODSETKI_BANKU_ABS]
+    df_roczne[PREMIA_TOTAL] = df_roczne[PREMIA_SKLADNIK_NALICZ].cumsum()
+    del df_roczne[PREMIA_SKLADNIK_NALICZ]
 
     df_konto_styled = df_konto.style.format({
         MIESIAC: lambda d: d.strftime('%Y-%m'),
         WPLATA: '{:,.0f} zł'.format,
-        SUMA_WPLAT: '{:,.0f} zł'.format,
+        WPLATA_TOTAL: '{:,.0f} zł'.format,
         ODSETKI_BANKU_PCT: '{:,.2%}'.format,
         ODSETKI_BANKU_ABS: '{:,.0f} zł'.format,
         ODSETKI_BANKU_TOTAL: '{:,.0f} zł'.format,
         WPLATY_Z_ODSETKAMI: '{:,.2f} zł'.format,
-        SKLADNIK_NALICZ: '{:,.2f} zł'.format,
-        PREMIA_SUMARYCZNA: '{:,.2f} zł'.format,
+        PREMIA_SKLADNIK_NALICZ: '{:,.2f} zł'.format,
+        PREMIA_TOTAL: '{:,.2f} zł'.format,
         TOTAL_Z_PREMIA: '{:,.2f} zł'.format,
     })
     df_roczne_styled = df_roczne.style.format({
-        PREMIA_ROCZNA: '{:,.0f} zł'.format,
-        PREMIA_CALKOWITA: '{:,.0f} zł'.format,
-        SUMA_WPLAT: '{:,.0f} zł'.format,
-        WPLATA_CALKOWITA: '{:,.0f} zł'.format,
+        WPLATA_TOTAL: '{:,.0f} zł'.format,
+        ODSETKI_BANKU_TOTAL: '{:,.0f} zł'.format,
+        PREMIA_TOTAL: '{:,.0f} zł'.format,
     })
     return df_konto_styled, df_roczne_styled, df_konto, df_roczne
 
 
 def rysuj_wykres_lokaty(df_konto):
-    df_wykres_wplat = df_konto[[MIESIAC, SUMA_WPLAT, PREMIA_SUMARYCZNA]].set_index([
-                                                                                   MIESIAC])
+    df_wykres_wplat = df_konto[[MIESIAC, WPLATA_TOTAL, PREMIA_TOTAL]].set_index([
+        MIESIAC])
     fig, axs = plt.subplots(figsize=(8, 4))
     df_wykres_wplat.plot.area(ax=axs)
     axs.set_ylabel('Wartość')
