@@ -1,3 +1,9 @@
+# TODO: 1% premii mieszkaniowej dla banku
+# TODO: porównaj do EDO i do inflacji
+# TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
+# TODO: code formatting
+#       autopep8 --in-place --aggressive --aggressive *.py
+
 from typing import Callable
 
 import matplotlib.pyplot as plt
@@ -17,6 +23,8 @@ WPLATA = 'Wpłata'
 WPLATA_NR = "Wpłata nr"
 SUMA_WPLAT = 'Suma<br/>Wpłat'
 ODSETKI_BANKU_PCT = 'Odsetki<br/>banku<br/>[%]'
+ODSETKI_BANKU_ABS = 'Odsetki<br/>banku'
+ODSETKI_BANKU_TOTAL = 'Suma<br/>odsetek<br/>banku'
 WPLATY_Z_ODSETKAMI = "Wpłaty<br/>z<br/>odsetkami"
 SKLADNIK_NALICZ = 'Składnik<br/>Naliczeniowy'
 PREMIA_SUMARYCZNA = 'Premia<br/>Sumaryczna'
@@ -24,12 +32,6 @@ TOTAL_Z_PREMIA = 'Total<br/>z<br/>Premią'
 PREMIA_ROCZNA = "Premia<br/>roczna"
 WPLATA_CALKOWITA = 'Wpłata<br/>całkowita'
 PREMIA_CALKOWITA = 'Premia<br/>całkowita'
-
-# TODO: 1% dla banku
-# TODO: porównaj do EDO i do inflacji
-# TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
-# TODO: code formatting
-#       autopep8 --in-place --aggressive --aggressive *.py
 
 
 class Procent:
@@ -160,17 +162,24 @@ def symulacja_konta(data_startu: str,
         wplaty=df_konto[WPLATA], odsetki=df_konto[ODSETKI_BANKU_PCT],
         index=df_konto.index
     )
+    df_konto[ODSETKI_BANKU_ABS] = df_konto.apply(
+        lambda row: row[WPLATY_Z_ODSETKAMI] - row[SUMA_WPLAT], axis=1
+    )
+    df_konto[ODSETKI_BANKU_TOTAL] = df_konto[ODSETKI_BANKU_ABS].cumsum()
     df_konto = df_konto.reindex(
         columns=[
             MIESIAC,
             ROK,
             WPLATA,
+            SUMA_WPLAT,
             ODSETKI_BANKU_PCT,
+            ODSETKI_BANKU_ABS,
+            ODSETKI_BANKU_TOTAL,
             WPLATY_Z_ODSETKAMI,
             SKLADNIK_NALICZ,
-            SUMA_WPLAT,
             PREMIA_SUMARYCZNA,
             TOTAL_Z_PREMIA])
+
     df_roczne = df_konto[[WPLATA, SKLADNIK_NALICZ, ROK]].groupby(
         ROK).sum()
     df_roczne = df_roczne.rename(columns={
@@ -184,11 +193,13 @@ def symulacja_konta(data_startu: str,
         MIESIAC: lambda d: d.strftime('%Y-%m'),
         WPLATA: '{:,.0f} zł'.format,
         SUMA_WPLAT: '{:,.0f} zł'.format,
+        ODSETKI_BANKU_PCT: '{:,.2%}'.format,
+        ODSETKI_BANKU_ABS: '{:,.0f} zł'.format,
+        ODSETKI_BANKU_TOTAL: '{:,.0f} zł'.format,
+        WPLATY_Z_ODSETKAMI: '{:,.2f} zł'.format,
         SKLADNIK_NALICZ: '{:,.2f} zł'.format,
         PREMIA_SUMARYCZNA: '{:,.2f} zł'.format,
         TOTAL_Z_PREMIA: '{:,.2f} zł'.format,
-        ODSETKI_BANKU_PCT: '{:,.2%}'.format,
-        WPLATY_Z_ODSETKAMI: '{:,.2f} zł'.format
     })
     df_roczne_styled = df_roczne.style.format({
         PREMIA_ROCZNA: '{:,.0f} zł'.format,

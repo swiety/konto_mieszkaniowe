@@ -90,7 +90,8 @@ class TestKonMiesz(unittest.TestCase):
             oczekiwane)
 
     def test_licz_odsetki_procent_zlozony_oproc_zmienne_wplata_stala(self):
-        """Testy dla oprocentowania zmiennego i stałej wpłaty
+        """
+        Testy dla oprocentowania zmiennego i stałej wpłaty
         """
 
         wplaty = DataFrame([1000] * 6)
@@ -110,3 +111,40 @@ class TestKonMiesz(unittest.TestCase):
                                          odsetki=odsetki,
                                          index=index),
             oczekiwane)
+
+    def test_symulatora_przypadek_ze_strony_rzadowej(self):
+        """
+        Testuje scenariusz ze stron rządowych.
+
+        Konkretnie ze strony https://pierwszemieszkanie.gov.pl/.
+        Konkretny scenariusz:
+        - 3 lata oszczędzania
+        - po 1000zł miesięcznie
+        - przy 9.6% inflacji przez wszystkie 3 lata, wskaźnik wzrostu cen m2
+          nieistotny
+
+        Zgodnie z infografiką ze tej samej strony rządowej
+        https://www.gov.pl/photo/d64c123f-f6b6-4e32-982c-ae85680f408d
+        oczekiwana premia mieszkaniowa wynosi:
+        - rok 1, 12,000zł wpłacone, premia   624zł
+        - rok 2, 24,000zł wpłacone, premia 2,400zł
+        - rok 3, 36.000zł wpłacone, premia 5,328zł
+        """
+
+        df_inflacja1 = zalozenia_inflacji_i_wzrostu_m2(
+            inflacja=[pct / 100 for pct in [9.6] * 3], wzrost_m2=None)
+        _, _, df_konto, df_roczne = symulacja_konta(
+            data_startu='2024-01', ile_wplat=3 * 12, wysokosc_wplat=1000,
+            zalozenia=df_inflacja1, lokata=odsetki_bankowe_pekao)
+
+        oczekiwane = DataFrame(
+            index=pd.RangeIndex(start=2024,
+                                stop=2027,
+                                name=ROK).astype(np.int32),
+            data={
+                WPLATA_CALKOWITA: [12_000, 24_000, 36_000],
+                PREMIA_CALKOWITA: [624.00, 2_400.00, 5_328.00]
+            })
+
+        pd.testing.assert_frame_equal(
+            df_roczne[[WPLATA_CALKOWITA, PREMIA_CALKOWITA]], oczekiwane)
