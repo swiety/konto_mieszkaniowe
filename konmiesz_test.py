@@ -135,7 +135,7 @@ class TestKonMiesz(unittest.TestCase):
             inflacja=[pct / 100 for pct in [9.6] * 3], wzrost_m2=None)
         _, _, df_konto, df_roczne = symulacja_konta(
             data_startu='2024-01', ile_wplat=3 * 12, wysokosc_wplat=1000,
-            zalozenia=df_inflacja1, lokata=odsetki_bankowe_pekao)
+            zalozenia=df_inflacja1, lokata=PEKAO)
 
         oczekiwane = DataFrame(
             index=pd.RangeIndex(start=2024,
@@ -148,3 +148,13 @@ class TestKonMiesz(unittest.TestCase):
 
         pd.testing.assert_frame_equal(
             df_roczne[[WPLATA_TOTAL, PREMIA_TOTAL]], oczekiwane)
+
+    # def test_notebooka(self):
+    #     wyswietl_symulacje(
+    #         data_startu='2024-01',
+    #         ile_wplat=3 * 12,
+    #         wysokosc_wplat=1000,
+    #         zalozenia=zalozenia_inflacji_i_wzrostu_m2(
+    #             inflacja=[pct / 100 for pct in [9.6] * 3], wzrost_m2=None
+    #         ),
+    #         lokata=PEKAO)
