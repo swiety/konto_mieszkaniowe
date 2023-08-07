@@ -2,3 +2,4 @@ __pycache__
 scratchpad.py
 .idea/
 .venv/
+.ipynb_checkpoints/
