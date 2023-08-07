@@ -1,11 +1,10 @@
 # TODO: porównaj do EDO i do inflacji
 # TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
-# TODO: grupuj kolumny - wpłaty, odsetki, premia, totale
 # TODO: code formatting
 #       fswatch *py |\
 #       xargs -n 1 -I {} autopep8 --in-place --aggressive --aggressiv {}
 
-from typing import Callable, NamedTuple
+from typing import Callable, NamedTuple, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,6 +33,21 @@ PREMIA_TOTAL = 'Premia<br/>Sumaryczna'
 PREMIA_BEZ_PROWIZJI = 'Premia<br/>mieszk.<br/>z odliczoną<br/>prowizją banku'
 TOTAL_Z_PREMIA = 'Total z<br/>premią<br/>mieszkaniową'
 TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI = 'Total z odsetkami i<br/>premią mieszk.<br/>z odliczoną<br/>prowizją banku'
+GR_KOL_WPLATY = 'Wpłaty'
+GR_KOL_ODSETKI = 'Odsetki banku'
+GR_KOL_PREMIA = 'Premia Mieszkaniowa'
+GR_KOL_TOTALS = 'Totals'
+KOL_MIESIAC = (GR_KOL_WPLATY, MIESIAC)
+KOL_WPLATA = (GR_KOL_WPLATY, WPLATA)
+KOL_WPLATA_TOTAL = (GR_KOL_WPLATY, WPLATA_TOTAL)
+KOL_ODSETKI_BANKU_PCT = (GR_KOL_ODSETKI, ODSETKI_BANKU_PCT)
+KOL_ODSETKI_BANKU_ABS = (GR_KOL_ODSETKI, ODSETKI_BANKU_ABS)
+KOL_ODSETKI_BANKU_TOTAL = (GR_KOL_ODSETKI, ODSETKI_BANKU_TOTAL)
+KOL_PREMIA_SKLADNIK_NALICZ = (GR_KOL_PREMIA, PREMIA_SKLADNIK_NALICZ)
+KOL_PREMIA_TOTAL = (GR_KOL_PREMIA, PREMIA_TOTAL)
+KOL_PREMIA_BEZ_PROWIZJI = (GR_KOL_PREMIA, PREMIA_BEZ_PROWIZJI)
+KOL_TOTAL_Z_PREMIA = (GR_KOL_TOTALS, TOTAL_Z_PREMIA)
+KOL_TOTAL_TOTAL = (GR_KOL_TOTALS, TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI)
 
 
 class Procent:
@@ -133,6 +147,37 @@ def oblicz_premie_bez_prowizji_banku(premia_total: float) -> float:
     return premia_total * 0.99  # bank pobiera 1% prowizji, Art. 16.7.7 ustawy
 
 
+def multicols(grupa_kolumn: str, kolumny: list[str]) -> list[Tuple[str, str]]:
+    return [(grupa_kolumn, kolumna) for kolumna in kolumny]
+
+
+def aplikuj_style(df: DataFrame) -> Styler:
+    styled = df.style.format({
+        KOL_MIESIAC: lambda d: d.strftime('%Y-%m'),
+        KOL_WPLATA: '{:,.0f} zł'.format,
+        KOL_WPLATA_TOTAL: '{:,.0f} zł'.format,
+        KOL_ODSETKI_BANKU_PCT: '{:,.2%}'.format,
+        KOL_ODSETKI_BANKU_ABS: '{:,.2f} zł'.format,
+        KOL_ODSETKI_BANKU_TOTAL: '{:,.2f} zł'.format,
+        KOL_PREMIA_SKLADNIK_NALICZ: '{:,.2f} zł'.format,
+        KOL_PREMIA_TOTAL: '{:,.2f} zł'.format,
+        KOL_PREMIA_BEZ_PROWIZJI: '{:,.2f} zł'.format,
+        KOL_TOTAL_Z_PREMIA: '{:,.2f} zł'.format,
+        KOL_TOTAL_TOTAL: '{:,.2f} zł'.format,
+    }).set_table_styles([
+        {'selector': 'th.col_heading', 'props': 'text-align: center;'}
+    ], overwrite=False).set_properties(
+        subset=[GR_KOL_WPLATY], **{'background-color': 'lightgreen'}
+    ).set_properties(
+        subset=[GR_KOL_ODSETKI], **{'background-color': 'lightblue'}
+    ).set_properties(
+        subset=[GR_KOL_PREMIA], **{'background-color': 'lightcyan'}
+    ).set_properties(
+        subset=[GR_KOL_TOTALS], **{'background-color': 'lightyellow'}
+    )
+    return styled
+
+
 def symulacja_konta(data_startu: str,
                     ile_wplat: int,
                     wysokosc_wplat: int,
@@ -228,35 +273,46 @@ def symulacja_konta(data_startu: str,
         ]
     )
 
-    df_konto_styled = df_konto.style.format({
-        MIESIAC: lambda d: d.strftime('%Y-%m'),
-        WPLATA: '{:,.0f} zł'.format,
-        WPLATA_TOTAL: '{:,.0f} zł'.format,
-        ODSETKI_BANKU_PCT: '{:,.2%}'.format,
-        ODSETKI_BANKU_ABS: '{:,.2f} zł'.format,
-        ODSETKI_BANKU_TOTAL: '{:,.2f} zł'.format,
-        PREMIA_SKLADNIK_NALICZ: '{:,.2f} zł'.format,
-        PREMIA_TOTAL: '{:,.2f} zł'.format,
-        PREMIA_BEZ_PROWIZJI: '{:,.2f} zł'.format,
-        TOTAL_Z_PREMIA: '{:,.2f} zł'.format,
-        TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI: '{:,.2f} zł'.format,
-    }).set_table_styles([
-        {'selector': 'th.col_heading', 'props': 'text-align: center;'}
-    ], overwrite=False)
-    df_roczne_styled = df_roczne.style.format({
-        WPLATA_TOTAL: '{:,.0f} zł'.format,
-        ODSETKI_BANKU_TOTAL: '{:,.0f} zł'.format,
-        PREMIA_TOTAL: '{:,.0f} zł'.format,
-        PREMIA_BEZ_PROWIZJI: '{:,.0f} zł'.format,
-        TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI: '{:,.0f} zł'.format,
-    }).set_table_styles([
-        {'selector': 'th.col_heading', 'props': 'text-align: center;'}
-    ], overwrite=False)
+    df_konto_cols = \
+        multicols(GR_KOL_WPLATY,
+                  [MIESIAC,
+                   ROK,
+                   WPLATA,
+                   WPLATA_TOTAL]) + \
+        multicols(GR_KOL_ODSETKI,
+                  [ODSETKI_BANKU_PCT,
+                   ODSETKI_BANKU_ABS,
+                   ODSETKI_BANKU_TOTAL]) + \
+        multicols(GR_KOL_PREMIA,
+                  [PREMIA_SKLADNIK_NALICZ,
+                   PREMIA_TOTAL,
+                   PREMIA_BEZ_PROWIZJI]) + \
+        multicols(GR_KOL_TOTALS,
+                  [TOTAL_Z_PREMIA,
+                   TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI])
+    df_konto.columns = pd.MultiIndex.from_tuples(df_konto_cols)
+
+    df_roczne_cols = \
+        multicols(GR_KOL_WPLATY, [WPLATA_TOTAL]) + \
+        multicols(GR_KOL_ODSETKI, [ODSETKI_BANKU_TOTAL]) + \
+        multicols(GR_KOL_PREMIA, [PREMIA_TOTAL, PREMIA_BEZ_PROWIZJI]) + \
+        multicols(GR_KOL_TOTALS, [
+            TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI
+        ])
+
+    df_roczne.columns = pd.MultiIndex.from_tuples(df_roczne_cols)
+
+    df_konto_styled = aplikuj_style(df=df_konto)
+    df_roczne_styled = aplikuj_style(df=df_roczne)
+
     return df_konto_styled, df_roczne_styled, df_konto, df_roczne
 
 
 def rysuj_wykres_lokaty(df_konto):
-    df_wykres_wplat = df_konto[
+    # ungroup columns to single level 1st
+    df = df_konto.copy()
+    df.columns = df.columns.get_level_values(1)
+    df_wykres_wplat = df[
         [MIESIAC, WPLATA_TOTAL, ODSETKI_BANKU_TOTAL, PREMIA_BEZ_PROWIZJI]
     ].set_index([MIESIAC])
 

@@ -36,6 +36,12 @@ class TestKonMiesz(unittest.TestCase):
             0.13,
             "Art. 14.3: wskaźnik premii to wyższy czynnik")
 
+    def test_multicols(self):
+        self.assertEqual(multicols('Grupa', ['a', 'b']), [
+            ('Grupa', 'a'),
+            ('Grupa', 'b'),
+        ])
+
     def test_odsetki_bankowe_pekao_wczesna_lokata(self):
         daty = pd.date_range(
             start='2023-10-01',
@@ -177,9 +183,11 @@ class TestKonMiesz(unittest.TestCase):
                 WPLATA_TOTAL: [12_000, 24_000, 36_000],
                 PREMIA_TOTAL: [624.00, 2_400.00, 5_328.00]
             })
+        oczekiwane.columns = pd.MultiIndex.from_tuples([
+            KOL_WPLATA_TOTAL, KOL_PREMIA_TOTAL])
 
         pd.testing.assert_frame_equal(
-            df_roczne[[WPLATA_TOTAL, PREMIA_TOTAL]], oczekiwane)
+            df_roczne[[KOL_WPLATA_TOTAL, KOL_PREMIA_TOTAL]], oczekiwane)
 
     # def test_notebooka(self):
     #     wyswietl_symulacje(
