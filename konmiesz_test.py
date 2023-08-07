@@ -48,7 +48,8 @@ class TestKonMiesz(unittest.TestCase):
         # - do 2024-07-08 (czyli kolejne 4 miesięce) 3%
         # - a potem 1/7 inflacji (ostatnie 2 raty)
         expected = pd.DataFrame(data={
-            'Odsetki': [Procent(0.05)] * 6 + [Procent(0.03)] * 4 + [ProcentInflacji(1.0 / 7.0)] * 2
+            'Odsetki': [Procent(5.0)] * 6 + [Procent(3.0)] * 4
+            + [ProcentInflacji(100.0 * 1.0 / 7.0)] * 2
         }, index=pd.Index(range(1, 13)))
         pd.testing.assert_frame_equal(odsetki_pekao, expected)
 
@@ -63,9 +64,40 @@ class TestKonMiesz(unittest.TestCase):
         # - do 2024-07-08 (czyli pierwsze 7 miesięcy) 3%
         # - a potem 1/7 inflacji (osstatnie 5 rat)
         expected = pd.DataFrame(data={
-            'Odsetki': [Procent(0.03)] * 7 + [ProcentInflacji(1.0 / 7.0)] * 5
+            'Odsetki': [Procent(3.0)] * 7 +
+            [ProcentInflacji(100.0 * 1.0 / 7.0)] * 5
         }, index=pd.Index(range(1, 13)))
         pd.testing.assert_frame_equal(odsetki_pekao, expected)
+
+    def test_odsetki_bankowe_alior_wczesna_lokata(self):
+        daty = pd.date_range(
+            start='2023-10-01',
+            periods=7,
+            freq=pd.offsets.MonthBegin()
+        )
+        odsetki_alior = odsetki_bankowe_alior(daty)
+        # ponieważ lokata założona do 2023-12-31, to oprocentowanie:
+        # - do końca 2023 (3 raty) po 5%
+        # - a potem 1/6 inflacji (ostatnie 4 raty)
+        expected = pd.DataFrame(data={
+            'Odsetki': [Procent(5.0)] * 3 +
+            [ProcentInflacji(100 * 1.0 / 6.0)] * 4
+        }, index=pd.Index(range(1, 8)))
+        pd.testing.assert_frame_equal(odsetki_alior, expected)
+
+    def test_odsetki_bankowe_alior_pozna_lokata(self):
+        daty = pd.date_range(
+            start='2024-01-01',
+            periods=5,
+            freq=pd.offsets.MonthBegin()
+        )
+        odsetki_alior = odsetki_bankowe_alior(daty)
+        # ponieważ lokata założona po 2023-12-31, to oprocentowanie:
+        # - wszystkie 5 rat 1/6 inflacji
+        expected = pd.DataFrame(data={
+            'Odsetki': [ProcentInflacji(100 * 1.0 / 6.0)] * 5
+        }, index=pd.Index(range(1, 6)))
+        pd.testing.assert_frame_equal(odsetki_alior, expected)
 
     def test_licz_odsetki_procent_zlozony_oproc_stale_wplata_stala(self):
         """Testy dla stałego oprocentowania i wpłaty

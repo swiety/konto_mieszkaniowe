@@ -1,6 +1,5 @@
 # TODO: porównaj do EDO i do inflacji
 # TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
-# TODO: odsetki w Aliorze
 # TODO: grupuj kolumny - wpłaty, odsetki, premia, totale
 # TODO: code formatting
 #       fswatch *py |\
@@ -39,7 +38,7 @@ TOTAL_Z_ODSETKAMI_I_PREMIA_BEZ_PROWIZJI = 'Total z odsetkami i<br/>premią miesz
 
 class Procent:
     def __init__(self, pct: float) -> None:
-        self.pct = pct
+        self.pct = pct / 100.0
 
     def efektywny_procent(self, inflacja: float) -> float:
         return self.pct
@@ -300,9 +299,9 @@ def odsetki_bankowe_pekao(daty: pd.DatetimeIndex) -> DataFrame:
     """
 
     data_3pct = pd.Timestamp(2024, 7, 9)
-    pct5 = Procent(0.05)
-    pct3 = Procent(0.03)
-    pct1_7th_infl = ProcentInflacji(1.0 / 7.0)
+    pct5 = Procent(5.0)
+    pct3 = Procent(3.0)
+    pct1_7th_infl = ProcentInflacji(100.0 * 1.0 / 7.0)
 
     if daty[0] < pd.Timestamp(2023, 11, 1):  # założona przed końcem 2023-10-31
         ile_5pct = 6  # pierwsze 6 miesięcy oprocentowanie 5%
@@ -324,6 +323,38 @@ def odsetki_bankowe_pekao(daty: pd.DatetimeIndex) -> DataFrame:
 
 
 PEKAO = Bank(name="Pekao", oprocentowanie_lokaty=odsetki_bankowe_pekao)
+
+
+def odsetki_bankowe_alior(daty: pd.DatetimeIndex) -> DataFrame:
+    """
+    Zwraca oprocentowanie lokaty w banku Alior.
+
+    Stan na 2023-07-29, źródło:
+    https://www.aliorbank.pl/klienci-indywidualni/oszczednosci/konto-mieszkaniowe.html
+
+    - 5% w skali roku oprocentowanie promocyjne do 31 grudnia 2023 r.
+    - potem 2% (zakładam 1/6 inflacji, na dzisiaj inflacja 11.5%)
+
+    Args:
+        daty (pd.DatetimeIndex): daty poszczególnych wpłat
+
+    Returns:
+        DataFrame: jedna kolumna 'Odsetki' typu Procent/ProcentInflacji
+    """
+
+    data_promocji = pd.Timestamp(2024, 1, 1)
+    ile_5pct = np.count_nonzero(daty < data_promocji)
+    ile_reszty = len(daty) - ile_5pct
+    pct5 = Procent(5)
+    pct1_6th_infl = ProcentInflacji(100.0 * 1.0 / 6.0)
+
+    pct = [pct5] * ile_5pct + [pct1_6th_infl] * ile_reszty
+    return DataFrame(data={
+        'Odsetki': pct
+    }, index=pd.Index(range(1, len(daty) + 1)))
+
+
+ALIOR = Bank(name="Pekao", oprocentowanie_lokaty=odsetki_bankowe_alior)
 
 
 def licz_odsetki_procent_zlozony(
@@ -385,6 +416,8 @@ def wyswietl_symulacje(data_startu: str,
 
     display(HTML(f"""
 <h2>Wykres wpłat, odsetek bankowych i naliczonej prowizji mieszkaniowej</h2>
+Założenia inflacji i wzrostu ceny m2 patrz niżej.  Odsetki bankowe liczone dla
+banku {lokata.name}.
                  """))
     rysuj_wykres_lokaty(df_konto)
     display(HTML(f"""
