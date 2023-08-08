@@ -42,6 +42,93 @@ class TestKonMiesz(unittest.TestCase):
             ('Grupa', 'b'),
         ])
 
+    def test_oblicz_premie_mieszkaniowa_I_rok_krotszy_niz_9mcy(self):
+        """
+        Test gdy w pierwszym roku konto było prowadzone krócej niż 9 miesięcy.
+
+        Zgodnie z art. 14.1 ustawy, jeśli w pierwszym roku konto było
+        prowadzone przez okres krótszy niż 9 miesięcy premia za ten rok nie
+        przysługuje.
+        """
+
+        ile_wplat = 36
+        daty_wplat = pd.date_range(
+            start='2023-05-01',
+            periods=ile_wplat,
+            freq=pd.offsets.MonthBegin()
+        )
+        index = pd.Index(range(1, ile_wplat + 1), name=WPLATA_NR)
+        df_konto = DataFrame(data={
+            MIESIAC: daty_wplat,
+            WPLATA_TOTAL: range(1000, 1000 * (ile_wplat + 1), 1000)
+        },
+            index=index
+        )
+        df_konto[ROK] = pd.DatetimeIndex(df_konto[MIESIAC]).year
+        del df_konto[MIESIAC]
+        zalozenia = zalozenia_inflacji_i_wzrostu_m2(
+            data_startu='2023', inflacja=[pct / 100 for pct in [12] * 4],
+            wzrost_m2=None)
+
+        # w 2023 tylko 8 rat, nie ma jeszcze premii
+        skladniki_premii = [0.00] * 8
+        df = df_konto.tail(-8)  # omiń raty z pierwszego roku
+
+        for _, row in df.iterrows():
+            suma = row[WPLATA_TOTAL]
+            premia = zalozenia.at[str(row[ROK]), PREMIA]
+            skladnik = suma * premia / 12
+            skladniki_premii.append(skladnik)
+
+        oczekiwane = DataFrame(data=skladniki_premii, index=index)
+
+        testowane = oblicz_premie_mieszkaniowa(
+            df=df_konto, zalozenia=zalozenia)
+        pd.testing.assert_frame_equal(testowane, oczekiwane)
+
+    def test_oblicz_premie_mieszkaniowa_I_rok_niekrotszy_niz_9mcy(self):
+        """
+        Test gdy w pierwszym roku konto było prowadzone co najmniej 9 miesięcy.
+
+        Zgodnie z art. 14.1 ustawy, jeśli w pierwszym roku konto było
+        prowadzone przez okres krótszy niż 9 miesięcy premia za ten rok nie
+        przysługuje.
+        """
+        ile_wplat = 36
+        daty_wplat = pd.date_range(
+            start='2023-04-01',
+            periods=ile_wplat,
+            freq=pd.offsets.MonthBegin()
+        )
+        index = pd.Index(range(1, ile_wplat + 1), name=WPLATA_NR)
+        df_konto = DataFrame(data={
+            MIESIAC: daty_wplat,
+            WPLATA_TOTAL: range(1000, 1000 * (ile_wplat + 1), 1000)
+        },
+            index=index
+        )
+        df_konto[ROK] = pd.DatetimeIndex(df_konto[MIESIAC]).year
+        del df_konto[MIESIAC]
+        zalozenia = zalozenia_inflacji_i_wzrostu_m2(
+            data_startu='2023', inflacja=[pct / 100 for pct in [12] * 4],
+            wzrost_m2=None)
+
+        # w 2023 było 9 rat, liczymy premię od początku
+        skladniki_premii = []
+        df = df_konto
+
+        for _, row in df.iterrows():
+            suma = row[WPLATA_TOTAL]
+            premia = zalozenia.at[str(row[ROK]), PREMIA]
+            skladnik = suma * premia / 12
+            skladniki_premii.append(skladnik)
+
+        oczekiwane = DataFrame(data=skladniki_premii, index=index)
+
+        testowane = oblicz_premie_mieszkaniowa(
+            df=df_konto, zalozenia=zalozenia)
+        pd.testing.assert_frame_equal(testowane, oczekiwane)
+
     def test_odsetki_bankowe_pekao_wczesna_lokata(self):
         daty = pd.date_range(
             start='2023-10-01',
@@ -170,7 +257,8 @@ class TestKonMiesz(unittest.TestCase):
         """
 
         df_inflacja1 = zalozenia_inflacji_i_wzrostu_m2(
-            inflacja=[pct / 100 for pct in [9.6] * 3], wzrost_m2=None)
+            data_startu='2024', inflacja=[
+                pct / 100 for pct in [9.6] * 3], wzrost_m2=None)
         _, _, df_konto, df_roczne = symulacja_konta(
             data_startu='2024-01', ile_wplat=3 * 12, wysokosc_wplat=1000,
             zalozenia=df_inflacja1, lokata=PEKAO)
@@ -186,15 +274,15 @@ class TestKonMiesz(unittest.TestCase):
         oczekiwane.columns = pd.MultiIndex.from_tuples([
             KOL_WPLATA_TOTAL, KOL_PREMIA_TOTAL])
 
-        pd.testing.assert_frame_equal(
-            df_roczne[[KOL_WPLATA_TOTAL, KOL_PREMIA_TOTAL]], oczekiwane)
+        testowane = df_roczne[[KOL_WPLATA_TOTAL, KOL_PREMIA_TOTAL]]
+        pd.testing.assert_frame_equal(testowane, oczekiwane)
 
     # def test_notebooka(self):
     #     wyswietl_symulacje(
     #         data_startu='2024-01',
     #         ile_wplat=3 * 12,
     #         wysokosc_wplat=1000,
-    #         zalozenia=zalozenia_inflacji_i_wzrostu_m2(
+    #         zalozenia=zalozenia_inflacji_i_wzrostu_m2(data_startu='2024',
     #             inflacja=[pct / 100 for pct in [9.6] * 3], wzrost_m2=None
     #         ),
     #         lokata=PEKAO)

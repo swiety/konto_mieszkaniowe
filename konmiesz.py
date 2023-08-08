@@ -1,5 +1,4 @@
 # TODO: porównaj do EDO i do inflacji
-# TODO: pierwszy rok bez premii jak nie ma 9 rat, art 14.1
 # TODO: code formatting
 #       fswatch *py |\
 #       xargs -n 1 -I {} autopep8 --in-place --aggressive --aggressiv {}
@@ -108,6 +107,7 @@ def roczny_wskaznik_premii(inflacja: float, wzrost_m2: float | None) -> float:
 
 
 def zalozenia_inflacji_i_wzrostu_m2(
+        data_startu: str,
         inflacja: list,
         wzrost_m2: list) -> DataFrame:
     df_inflacja = DataFrame(data={
@@ -115,7 +115,7 @@ def zalozenia_inflacji_i_wzrostu_m2(
         WZROST_M2: wzrost_m2
     },
         index=pd.date_range(
-        start='2024',
+        start=data_startu,
         periods=len(inflacja),
         freq=pd.offsets.YearBegin(),
         name=ROK
@@ -149,6 +149,33 @@ def oblicz_premie_bez_prowizji_banku(premia_total: float) -> float:
 
 def multicols(grupa_kolumn: str, kolumny: list[str]) -> list[Tuple[str, str]]:
     return [(grupa_kolumn, kolumna) for kolumna in kolumny]
+
+
+def oblicz_premie_mieszkaniowa(df: DataFrame,
+                               zalozenia: DataFrame) -> DataFrame:
+    """
+    Oblicza należną premię mieszkaniową dla poszczególnych wpłat.
+
+    Args:
+        df (DataFrame): data frame z 2 kolumnami:
+             WPLATA_TOTAL: suma bieżąca po kolejnych wpłatach
+             ROK:          rok kalendarzowy tej wpłaty
+        zalozenia (DataFrame): założenia premii mieszkaniowej na dany rok
+
+    Returns:
+        DataFrame: składniki naliczeniowe premii mieszkaniowej dla kolejnych
+        wpłat.
+    """
+    pierwszy_rok = df[ROK].min()
+    ile_rat_pierwszego_roku = np.count_nonzero(df[ROK] == pierwszy_rok)
+    omin_pierwszy_rok = ile_rat_pierwszego_roku < 9
+    df_premia = df.apply(
+        lambda row: 0 if omin_pierwszy_rok and row[ROK] == pierwszy_rok else
+        oblicz_skladnik_naliczeniowy(
+            suma_wplat=row[WPLATA_TOTAL],
+            premia=zalozenia.at[str(row[ROK]), PREMIA]), axis=1
+    )
+    return DataFrame(df_premia)
 
 
 def aplikuj_style(df: DataFrame) -> Styler:
@@ -199,12 +226,8 @@ def symulacja_konta(data_startu: str,
     )
     df_konto[WPLATA_TOTAL] = df_konto[WPLATA].cumsum()
     df_konto[ROK] = pd.DatetimeIndex(df_konto[MIESIAC]).year
-    df_konto[PREMIA_SKLADNIK_NALICZ] = df_konto.apply(
-        lambda row: oblicz_skladnik_naliczeniowy(
-            suma_wplat=row[WPLATA_TOTAL],
-            premia=zalozenia.at[str(row[ROK]), PREMIA]
-        ), axis=1
-    )
+    df_konto[PREMIA_SKLADNIK_NALICZ] = oblicz_premie_mieszkaniowa(
+        df=df_konto[[WPLATA_TOTAL, ROK]], zalozenia=zalozenia)
     df_konto[PREMIA_TOTAL] = df_konto[PREMIA_SKLADNIK_NALICZ].cumsum()
     df_konto[PREMIA_BEZ_PROWIZJI] = df_konto[PREMIA_TOTAL].apply(
         oblicz_premie_bez_prowizji_banku)
